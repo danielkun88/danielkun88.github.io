@@ -1,0 +1,48 @@
+<!-- directions.html (pagina per ottenere indicazioni) -->
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Indicazioni - Il Mio Sito</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header>
+    <!-- menu incluso -->
+  </header>
+
+  <main>
+    <h1>Indicazioni stradali</h1>
+    <p>Ottieni indicazioni dalla tua posizione attuale fino alla nostra sede.</p>
+    <button id="get-route">Apri indicazioni su Google Maps</button>
+    <p id="status"></p>
+  </main>
+
+  <footer>
+    <p>&copy; 2025 Il Mio Sito</p>
+  </footer>
+
+  <script>
+    document.getElementById('get-route').addEventListener('click', function() {
+      var status = document.getElementById('status');
+      if (!navigator.geolocation) {
+        status.textContent = 'Geolocalizzazione non supportata dal browser.';
+        return;
+      }
+      status.textContent = 'Recupero posizione...';
+      navigator.geolocation.getCurrentPosition(function(position) {
+        var lat = position.coords.latitude;
+        var lng = position.coords.longitude;
+        // Inserisci qui la destinazione desiderata
+        var destination = 'Via+Roma,+1,+Milano';
+        var url = `https://www.google.com/maps/dir/?api=1&origin=${lat},${lng}&destination=${destination}&travelmode=driving`;
+        window.open(url, '_blank');
+        status.textContent = '';
+      }, function(error) {
+        status.textContent = 'Errore nel recupero della posizione: ' + error.message;
+      });
+    });
+  </script>
+</body>
+</html>
