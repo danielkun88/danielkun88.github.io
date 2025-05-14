@@ -1,0 +1,64 @@
+<!-- territory.html -->
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Territori - Il Mio Sito</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map { height: 80vh; width: 100%; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <!-- menu incluso -->
+    <nav>
+      <ul class="menu">
+        <li><a href="index.html">Home</a></li>
+        <li class="has-submenu">
+          <a href="#">Sezioni</a>
+          <ul class="submenu">
+            <li><a href="about.html">Chi Siamo</a></li>
+            <li><a href="projects.html">Progetti</a></li>
+            <li><a href="directions.html">Indicazioni</a></li>
+            <li><a href="territory.html">Territori</a></li>
+          </ul>
+        </li>
+        <li><a href="contact.html">Contatti</a></li>
+      </ul>
+    </nav>
+  </header>
+  <main>
+    <h1>Visualizza i Territori</h1>
+    <div id="map"></div>
+    <p>Caricamento dati KML...</p>
+  </main>
+  <footer>
+    <p>&copy; 2025 Il Mio Sito</p>
+  </footer>
+  <!-- Leaflet JS + Omnivore per KML -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
+  <script>
+    // Inizializza la mappa
+    var map = L.map('map').setView([45.4642, 9.19], 10); // default Milano
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Carica il file KML dal repository
+    omnivore.kml('kml/Territori Pavia.kml')
+      .on('ready', function() {
+        map.fitBounds(this.getBounds());
+      })
+      .on('error', function(e) {
+        console.error(e.error);
+        alert('Errore nel caricamento del KML');
+      })
+      .addTo(map);
+  </script>
+</body>
+</html>
