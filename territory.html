@@ -4,61 +4,89 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Territori - Il Mio Sito</title>
+  <title id="page-title">Territorio</title>
   <link rel="stylesheet" href="css/styles.css">
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
-    #map { height: 80vh; width: 100%; margin: 1rem 0; }
+    html, body { height: 100%; margin: 0; }
+    #map { height: 70vh; width: 100%; }
+    .controls { padding: 1rem; text-align: center; }
+    .controls a, .controls button { display: inline-block; margin: 0.5rem; text-decoration: none; font-size: 1rem; }
   </style>
 </head>
 <body>
-  <header>
-    <!-- menu incluso -->
-    <nav>
-      <ul class="menu">
-        <li><a href="index.html">Home</a></li>
-        <li class="has-submenu">
-          <a href="#">Sezioni</a>
-          <ul class="submenu">
-            <li><a href="about.html">Chi Siamo</a></li>
-            <li><a href="projects.html">Progetti</a></li>
-            <li><a href="directions.html">Indicazioni</a></li>
-            <li><a href="territory.html">Territori</a></li>
-          </ul>
-        </li>
-        <li><a href="contact.html">Contatti</a></li>
-      </ul>
-    </nav>
-  </header>
   <main>
-    <h1>Visualizza i Territori</h1>
+    <h1 id="title">Territorio</h1>
     <div id="map"></div>
-    <p>Caricamento dati KML...</p>
+    <div class="controls">
+      <button id="get-directions">Ottieni indicazioni</button>
+    </div>
   </main>
   <footer>
-    <p>&copy; 2025 Il Mio Sito</p>
+    <p>&copy; 2025</p>
   </footer>
+
   <!-- Leaflet JS + Omnivore per KML -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
   <script>
+    // Estrai parametri URL
+    var params = new URLSearchParams(window.location.search);
+    var kmlFile = params.get('kml') || 'default.kml';
+    var territoryName = params.get('name') || 'Territorio';
+    // Imposta titolo
+    document.getElementById('title').textContent = territoryName;
+    document.getElementById('page-title').textContent = territoryName + ' - Pavia Spagnola';
+
     // Inizializza la mappa
-    var map = L.map('map').setView([45.4642, 9.19], 10); // default Milano
+    var map = L.map('map').setView([45.4642, 9.19], 10);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Carica il file KML dal repository
-    omnivore.kml('kml/Territori Pavia.kml')
+    // Percorso KML
+    var kmlPath = 'kml/' + kmlFile;
+    console.log('Caricamento KML da:', kmlPath);
+
+    // Carica KML e applica stile personalizzato
+    var kmlLayer = omnivore.kml(kmlPath)
       .on('ready', function() {
+        // Sovrascrive lo stile dal KML: bordo tratteggiato rosso, riempimento verde chiaro
+        this.eachLayer(function(layer) {
+          layer.setStyle({
+            color: 'red',            // bordo rosso
+            weight: 3,               // spessore bordo
+            dashArray: '8,8',        // tratteggio
+            fillColor: 'orange',      // riempimento verde
+            fillOpacity: 0.1         // trasparenza
+          });
+        });
         map.fitBounds(this.getBounds());
       })
       .on('error', function(e) {
-        console.error(e.error);
-        alert('Errore nel caricamento del KML');
+        console.error('Errore caricamento KML:', e.error);
+        alert('Errore nel caricamento del KML: ' + e.error.message);
       })
       .addTo(map);
+
+    // Direzioni: dal punto corrente al centro del territorio
+    document.getElementById('get-directions').addEventListener('click', function() {
+      if (!navigator.geolocation) {
+        alert('Geolocalizzazione non supportata');
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(function(pos) {
+        var origin = pos.coords.latitude + ',' + pos.coords.longitude;
+        var center = map.getCenter();
+        var destination = center.lat + ',' + center.lng;
+        var url = 'https://www.google.com/maps/dir/?api=1&origin=' + origin
+                  + '&destination=' + destination + '&travelmode=driving';
+        window.open(url, '_blank');
+      }, function(err) {
+        alert('Errore geolocalizzazione: ' + err.message);
+      });
+    });
   </script>
 </body>
 </html>
