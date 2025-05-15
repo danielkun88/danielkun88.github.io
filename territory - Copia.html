@@ -12,7 +12,7 @@
     html, body { height: 100%; margin: 0; }
     #map { height: 70vh; width: 100%; }
     .controls { padding: 1rem; text-align: center; }
-    .controls button { display: inline-block; margin: 0.5rem; text-decoration: none; font-size: 1rem; }
+    .controls a, .controls button { display: inline-block; margin: 0.5rem; text-decoration: none; font-size: 1rem; }
   </style>
 </head>
 <body>
@@ -24,7 +24,7 @@
     </div>
   </main>
   <footer>
-    <p>&copy; 2025 Il Mio Sito</p>
+    <p>&copy; 2025</p>
   </footer>
 
   <!-- Leaflet JS + Omnivore per KML -->
@@ -35,8 +35,9 @@
     var params = new URLSearchParams(window.location.search);
     var kmlFile = params.get('kml') || 'default.kml';
     var territoryName = params.get('name') || 'Territorio';
+    // Imposta titolo
     document.getElementById('title').textContent = territoryName;
-    document.getElementById('page-title').textContent = territoryName;
+    document.getElementById('page-title').textContent = territoryName + ' - Pavia Spagnola';
 
     // Inizializza la mappa
     var map = L.map('map').setView([45.4642, 9.19], 10);
@@ -44,51 +45,21 @@
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Posizione utente in tempo reale
-    var userMarker = null;
-    var accuracyCircle = null;
-    if (navigator.geolocation) {
-      navigator.geolocation.watchPosition(
-        function(pos) {
-          var lat = pos.coords.latitude;
-          var lng = pos.coords.longitude;
-          var accuracy = pos.coords.accuracy;
-          var userLatLng = [lat, lng];
-          if (!userMarker) {
-            userMarker = L.marker(userLatLng, {
-              title: 'La tua posizione',
-              icon: L.icon({
-                iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-                iconAnchor: [12, 41]
-              })
-            }).addTo(map);
-            
-          } else {
-            userMarker.setLatLng(userLatLng);
-          }
-        },
-        function(err) {
-          console.error('Errore geolocalizzazione:', err.message);
-        },
-        { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 }
-      );
-    } else {
-      alert('Geolocalizzazione non supportata dal browser.');
-    }
-
     // Percorso KML
     var kmlPath = 'kml/' + kmlFile;
     console.log('Caricamento KML da:', kmlPath);
 
+    // Carica KML e applica stile personalizzato
     var kmlLayer = omnivore.kml(kmlPath)
       .on('ready', function() {
+        // Sovrascrive lo stile dal KML: bordo tratteggiato rosso, riempimento verde chiaro
         this.eachLayer(function(layer) {
           layer.setStyle({
-            color: 'red',
-            weight: 2,
-            dashArray: '8,8',
-            fillColor: 'green',
-            fillOpacity: 0.2
+            color: 'red',            // bordo rosso
+            weight: 3,               // spessore bordo
+            dashArray: '8,8',        // tratteggio
+            fillColor: 'orange',      // riempimento verde
+            fillOpacity: 0.1         // trasparenza
           });
         });
         map.fitBounds(this.getBounds());
@@ -117,3 +88,5 @@
       });
     });
   </script>
+</body>
+</html>
