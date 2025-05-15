@@ -6,13 +6,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title id="page-title">Territorio</title>
   <link rel="stylesheet" href="css/styles.css">
-  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
     html, body { height: 100%; margin: 0; }
     #map { height: 70vh; width: 100%; }
     .controls { padding: 1rem; text-align: center; }
-    .controls button { display: inline-block; margin: 0.5rem; text-decoration: none; font-size: 1rem; }
+    .controls button { display: inline-block; margin: 0.5rem; font-size: 1rem; }
   </style>
 </head>
 <body>
@@ -24,102 +23,61 @@
     </div>
   </main>
   <footer>
-    <p>&copy; 2025 Il Mio Sito</p>
+    <p>&copy; 2025</p>
   </footer>
 
-  <!-- Leaflet JS + Omnivore per KML -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
   <script>
-    // Estrai parametri URL
+    // Parametri URL
     var params = new URLSearchParams(window.location.search);
     var kmlFile = params.get('kml') || 'default.kml';
     var territoryName = params.get('name') || 'Territorio';
     document.getElementById('title').textContent = territoryName;
     document.getElementById('page-title').textContent = territoryName;
 
-    // Inizializza la mappa
+    // Mappa
     var map = L.map('map').setView([45.4642, 9.19], 10);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(map);
 
-    // Posizione utente in tempo reale
-    var userMarker = null;
-    var accuracyCircle = null;
+    // Mostra posizione in tempo reale
+    var userMarker, accuracyCircle;
     if (navigator.geolocation) {
-      navigator.geolocation.watchPosition(
-        function(pos) {
-          var lat = pos.coords.latitude;
-          var lng = pos.coords.longitude;
-          var accuracy = pos.coords.accuracy;
-          var userLatLng = [lat, lng];
-          if (!userMarker) {
-            userMarker = L.marker(userLatLng, {
-              title: 'La tua posizione',
-              icon: L.icon({
-                iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-                iconAnchor: [12, 41]
-              })
-            }).addTo(map);
-            accuracyCircle = L.circle(userLatLng, {
-              radius: accuracy,
-              color: '#136AEC',
-              fillColor: '#136AEC',
-              fillOpacity: 0.1
-            }).addTo(map);
-          } else {
-            userMarker.setLatLng(userLatLng);
-            accuracyCircle.setLatLng(userLatLng).setRadius(accuracy);
-          }
-        },
-        function(err) {
-          console.error('Errore geolocalizzazione:', err.message);
-        },
-        { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 }
-      );
-    } else {
-      alert('Geolocalizzazione non supportata dal browser.');
+      navigator.geolocation.watchPosition(function(pos) {
+        var lat = pos.coords.latitude, lng = pos.coords.longitude, acc = pos.coords.accuracy;
+        var latlng = [lat, lng];
+        if (!userMarker) {
+          userMarker = L.marker(latlng).addTo(map);
+          accuracyCircle = L.circle(latlng, { radius: acc, color: '#136AEC', fillOpacity: 0.15 }).addTo(map);
+        } else {
+          userMarker.setLatLng(latlng);
+          accuracyCircle.setLatLng(latlng).setRadius(acc);
+        }
+      }, function(err) { console.error(err); }, { enableHighAccuracy: true, maximumAge:10000 });
     }
 
-    // Percorso KML
-    var kmlPath = 'kml/' + kmlFile;
-    console.log('Caricamento KML da:', kmlPath);
-
-    var kmlLayer = omnivore.kml(kmlPath)
+    // Carica KML e calcola centroide
+    var territoryCenter;
+    var kmlLayer = omnivore.kml('kml/' + kmlFile)
       .on('ready', function() {
         this.eachLayer(function(layer) {
-          layer.setStyle({
-            color: 'red',
-            weight: 2,
-            dashArray: '8,8',
-            fillColor: 'green',
-            fillOpacity: 0.2
-          });
+          layer.setStyle({ color:'red', weight:2, dashArray:'8,8', fillColor:'green', fillOpacity:0.2 });
         });
-        map.fitBounds(this.getBounds());
-      })
-      .on('error', function(e) {
-        console.error('Errore caricamento KML:', e.error);
-        alert('Errore nel caricamento del KML: ' + e.error.message);
+        var bounds = this.getBounds();
+        territoryCenter = bounds.getCenter();
+        map.fitBounds(bounds);
       })
       .addTo(map);
 
-    // Direzioni: dal punto corrente al centro del territorio
+    // Indicazioni
     document.getElementById('get-directions').addEventListener('click', function() {
-      if (!navigator.geolocation) {
-        alert('Geolocalizzazione non supportata');
-        return;
-      }
+      if (!navigator.geolocation || !territoryCenter) return;
       navigator.geolocation.getCurrentPosition(function(pos) {
         var origin = pos.coords.latitude + ',' + pos.coords.longitude;
-        var center = map.getCenter();
-        var destination = center.lat + ',' + center.lng;
-        var url = 'https://www.google.com/maps/dir/?api=1&origin=' + origin
-                  + '&destination=' + destination + '&travelmode=driving';
-        window.open(url, '_blank');
-      }, function(err) {
-        alert('Errore geolocalizzazione: ' + err.message);
+        var dest = territoryCenter.lat + ',' + territoryCenter.lng;
+        window.open('https://www.google.com/maps/dir/?api=1&origin=' + origin + '&destination=' + dest + '&travelmode=driving', '_blank');
       });
     });
   </script>
+</body>
+</html>
