@@ -60,23 +60,31 @@
 
     // 3. Posizione utente in tempo reale
     var userMarker, accuracyCircle, userLatLng;
-    if (navigator.geolocation) {
-      navigator.geolocation.watchPosition(function(pos) {
-        var lat = pos.coords.latitude, lng = pos.coords.longitude, acc = pos.coords.accuracy;
-        userLatLng = [lat, lng];
-        if (!userMarker) {
-          //userMarker = L.marker(userLatLng).addTo(map);
-          accuracyCircle = L.circle(userLatLng, {
-            radius: acc, color: '#136AEC', fillOpacity: 0.15
-          }).addTo(map);
-        } else {
-          //userMarker.setLatLng(userLatLng);
-          accuracyCircle.setLatLng(userLatLng).setRadius(acc);
-        }
-      }, function(err) { console.error(err); }, {
-        enableHighAccuracy: true, maximumAge:10000
-      });
-    }
+    // Appena la pagina viene caricata, chiedo permesso di geolocalizzazione
+	// e salvo userLatLng per poterla usare poi (anche nel click di “Ottieni indicazioni”).
+	if (navigator.geolocation) {
+	  navigator.geolocation.watchPosition(function(pos) {
+		var lat = pos.coords.latitude,
+			lng = pos.coords.longitude,
+			acc = pos.coords.accuracy;
+		userLatLng = [lat, lng];
+		if (!userMarker) {
+		  userMarker = L.marker(userLatLng).addTo(map);
+		  accuracyCircle = L.circle(userLatLng, {
+			radius: acc, color: '#136AEC', fillOpacity: 0.15
+		  }).addTo(map);
+		} else {
+		  userMarker.setLatLng(userLatLng);
+		  accuracyCircle.setLatLng(userLatLng).setRadius(acc);
+		}
+	  }, function(err) {
+		console.error("Errore geolocalizzazione:", err);
+	  }, {
+		enableHighAccuracy: true,
+		maximumAge: 10000
+	  });
+	}
+
 
     // 4. Carica KML, imposta stile e calcola centroide
     var territoryCenter;
