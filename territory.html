@@ -7,6 +7,11 @@
   <title id="page-title">Territorio</title>
   <link rel="stylesheet" href="css/styles.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <!-- Leaflet Routing Machine CSS -->
+  <link 
+    rel="stylesheet" 
+    href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css"
+  />
   <style>
     html, body { height: 100%; margin: 0; }
     #map { height: 70vh; width: 100%; }
@@ -20,48 +25,68 @@
     <div id="map"></div>
     <div class="controls">
       <button id="get-directions">Ottieni indicazioni</button>
+      <button id="clear-route">Pulisci rotta</button>
     </div>
+	<section id="info-section">
+	<h2>Lista No Tocar</h2>
+		<ul id="phone-list"></ul>
+	</section>
   </main>
   <footer>
     <p>&copy; 2025</p>
   </footer>
 
+  <!-- Dipendenze -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-omnivore@0.3.4/leaflet-omnivore.min.js"></script>
+  <!-- Leaflet Routing Machine JS -->
+  <script 
+    src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.min.js">
+  </script>
+
   <script>
-    // Parametri URL
+    // 1. Parametri URL
     var params = new URLSearchParams(window.location.search);
     var kmlFile = params.get('kml') || 'default.kml';
     var territoryName = params.get('name') || 'Territorio';
     document.getElementById('title').textContent = territoryName;
     document.getElementById('page-title').textContent = territoryName;
 
-    // Mappa
+    // 2. Inizializza mappa
     var map = L.map('map').setView([45.4642, 9.19], 10);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
 
-    // Mostra posizione in tempo reale
-    var userMarker, accuracyCircle;
+    // 3. Posizione utente in tempo reale
+    var userMarker, accuracyCircle, userLatLng;
     if (navigator.geolocation) {
       navigator.geolocation.watchPosition(function(pos) {
         var lat = pos.coords.latitude, lng = pos.coords.longitude, acc = pos.coords.accuracy;
-        var latlng = [lat, lng];
+        userLatLng = [lat, lng];
         if (!userMarker) {
-          userMarker = L.marker(latlng).addTo(map);
-          accuracyCircle = L.circle(latlng, { radius: acc, color: '#136AEC', fillOpacity: 0.15 }).addTo(map);
+          //userMarker = L.marker(userLatLng).addTo(map);
+          accuracyCircle = L.circle(userLatLng, {
+            radius: acc, color: '#136AEC', fillOpacity: 0.15
+          }).addTo(map);
         } else {
-          userMarker.setLatLng(latlng);
-          accuracyCircle.setLatLng(latlng).setRadius(acc);
+          //userMarker.setLatLng(userLatLng);
+          accuracyCircle.setLatLng(userLatLng).setRadius(acc);
         }
-      }, function(err) { console.error(err); }, { enableHighAccuracy: true, maximumAge:10000 });
+      }, function(err) { console.error(err); }, {
+        enableHighAccuracy: true, maximumAge:10000
+      });
     }
 
-    // Carica KML e calcola centroide
+    // 4. Carica KML, imposta stile e calcola centroide
     var territoryCenter;
     var kmlLayer = omnivore.kml('kml/' + kmlFile)
       .on('ready', function() {
         this.eachLayer(function(layer) {
-          layer.setStyle({ color:'red', weight:2, dashArray:'8,8', fillColor:'green', fillOpacity:0.2 });
+          layer.setStyle({
+            color: 'red', weight: 2, dashArray: '8,8',
+            fillColor: 'green', fillOpacity: 0.2
+          });
         });
         var bounds = this.getBounds();
         territoryCenter = bounds.getCenter();
@@ -69,15 +94,124 @@
       })
       .addTo(map);
 
-    // Indicazioni
+    // 5. Variabile globale per il routing
+    var routingControl = null;
+
+    // 6. Bottone “Ottieni indicazioni”
     document.getElementById('get-directions').addEventListener('click', function() {
-      if (!navigator.geolocation || !territoryCenter) return;
-      navigator.geolocation.getCurrentPosition(function(pos) {
-        var origin = pos.coords.latitude + ',' + pos.coords.longitude;
-        var dest = territoryCenter.lat + ',' + territoryCenter.lng;
-        window.open('https://www.google.com/maps/dir/?api=1&origin=' + origin + '&destination=' + dest + '&travelmode=driving', '_blank');
+      if (!navigator.geolocation || !userLatLng || !territoryCenter) {
+        alert("Attendi qualche istante per la geolocalizzazione o il caricamento del KML.");
+        return;
+      }
+      // Se esiste già un routing, rimuovilo
+      if (routingControl) {
+        map.removeControl(routingControl);
+      }
+      // Crea nuovo routing control
+      routingControl = L.Routing.control({
+        waypoints: [
+          L.latLng(userLatLng[0], userLatLng[1]),
+          L.latLng(territoryCenter.lat, territoryCenter.lng)
+        ],
+        router: L.Routing.osrmv1({
+          serviceUrl: 'https://router.project-osrm.org/route/v1'
+        }),
+        lineOptions: {
+          styles: [{ color: 'blue', opacity: 0.7, weight: 5 }]
+        },
+        createMarker: function(i, waypoint, n) {
+          var markerOpts = {};
+          if (i === 0) {
+            // marker origine (utente)
+            markerOpts.icon = L.icon({
+              iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
+              iconSize: [25, 41], iconAnchor: [12, 41],
+              popupAnchor: [1, -34]
+            });
+          } else {
+            // marker destinazione (centro KML)
+            markerOpts.icon = L.icon({
+              iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
+              iconSize: [25, 41], iconAnchor: [12, 41],
+              popupAnchor: [1, -34]
+            });
+          }
+          return L.marker(waypoint.latLng, markerOpts);
+        },
+        fitSelectedRoutes: true,
+        showAlternatives: false,
+        addWaypoints: false,
+        routeWhileDragging: false
+      }).addTo(map);
+
+      routingControl.on('routesfound', function(e) {
+        var summary = e.routes[0].summary;
+        console.log('Distanza: ' + (summary.totalDistance/1000).toFixed(2) +
+                    ' km, Durata: ' + (summary.totalTime/60).toFixed(1) + ' min');
       });
     });
+
+    // 7. Bottone “Pulisci rotta”
+    document.getElementById('clear-route').addEventListener('click', function() {
+      if (routingControl) {
+        map.removeControl(routingControl);
+        routingControl = null;
+      }
+    });
+	
+	  // 1. Costruisci il nome del file da caricare
+	//    Parto da territoryName, es. "Territorio 1"
+	//    Sostituisco tutti gli spazi (o caratteri non alfanumerici) con underscore
+	var safeName = territoryName
+    .trim()
+    .replace(/\s+/g, '_')          // "Territorio 1" → "Territorio_1"
+    .replace(/[^a-zA-Z0-9_]/g, ''); // rimuove eventuali altri caratteri non validi
+
+	var phoneFileName = 'data_' + safeName + '.txt'; 
+  
+	 // --------------- Inizio parte fetch-phone ---------------
+    // 2. Provo a fare fetch su questo file
+  document.addEventListener('DOMContentLoaded', function() {
+    fetch(phoneFileName)
+      .then(function(response) {
+        if (!response.ok) {
+          // Se non trovo il file, nascondo la sezione o mostro un avviso
+          console.warn('Impossibile caricare ' + phoneFileName + ': ' + response.statusText);
+          document.getElementById('info-section').style.display = 'none';
+          throw new Error('File non trovato: ' + phoneFileName);
+        }
+        return response.text();
+      })
+      .then(function(text) {
+        // Supponiamo che in data_Territorio_1.txt ci sia un numero per riga
+        var lines = text.split(/\r?\n/).map(function(riga) {
+          return riga.trim();
+        }).filter(function(riga) {
+          return riga !== '';
+        });
+
+        var ul = document.getElementById('phone-list');
+        if (lines.length === 0) {
+          // File esistente ma vuoto, nascondo comunque
+          document.getElementById('info-section').style.display = 'none';
+          return;
+        }
+        lines.forEach(function(numero) {
+          var li = document.createElement('li');
+          li.textContent = numero;
+          ul.appendChild(li);
+        });
+      })
+      .catch(function(err) {
+        // In caso di errore (file mancante, permessi, ecc.), già nascosto in then()
+        console.error(err);
+      });
+	});
+    // --------------- Fine parte fetch-phone ---------------
+	
+	
+	
+	
   </script>
 </body>
 </html>
