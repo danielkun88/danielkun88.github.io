@@ -1,4 +1,4 @@
-<!-- territory.html -->
+<!-- territory.html (rotatable version) -->
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -14,25 +14,45 @@
   />
   <style>
     html, body { height: 100%; margin: 0; }
-    #map { height: 70vh; width: 100%; }
+    #map { height: 60vh; width: 100%; touch-action: none; /* necessario per intercettare gesture touch */ }
     .controls { padding: 1rem; text-align: center; }
-    .controls button { display: inline-block; margin: 0.5rem; font-size: 1rem; }
+    .controls button,
+    .controls input[type="text"] {
+      display: inline-block;
+      margin: 0.5rem;
+      font-size: 1rem;
+      padding: 0.4rem;
+    }
+    .controls input[type="text"] {
+      width: 200px;
+    }
+
+    /* Manteniamo i controlli visivamente dritti quando ruotiamo la mappa */
+    .leaflet-control {
+      transform-origin: center center;
+      will-change: transform;
+    }
   </style>
 </head>
 <body>
   <main>
     <h1 id="title">Territorio</h1>
-	<section id="info-section">
-	<h2>Lista No Visitar</h2>
-		<ul id="phone-list"></ul>
-	</section>
+    <section id="info-section">
+      <h2>Lista No Visitar</h2>
+      <ul id="phone-list"></ul>
+    </section>
+
     <div id="map"></div>
+
     <div class="controls">
       <button id="get-directions">Ottieni indicazioni</button>
       <button id="clear-route">Pulisci rotta</button>
+      <!-- Neuovi elementi per il form -->
+      <input type="text" id="form-input" placeholder="Inserisci valore">
+      <button id="send-form">Invia</button>
     </div>
-	
   </main>
+
   <footer>
     <p>&copy; 2025</p>
   </footer>
@@ -61,31 +81,28 @@
 
     // 3. Posizione utente in tempo reale
     var userMarker, accuracyCircle, userLatLng;
-    // Appena la pagina viene caricata, chiedo permesso di geolocalizzazione
-	// e salvo userLatLng per poterla usare poi (anche nel click di “Ottieni indicazioni”).
-	if (navigator.geolocation) {
-	  navigator.geolocation.watchPosition(function(pos) {
-		var lat = pos.coords.latitude,
-			lng = pos.coords.longitude,
-			acc = pos.coords.accuracy;
-		userLatLng = [lat, lng];
-		if (!userMarker) {
-		  userMarker = L.marker(userLatLng).addTo(map);
-		  accuracyCircle = L.circle(userLatLng, {
-			radius: acc, color: '#136AEC', fillOpacity: 0.15
-		  }).addTo(map);
-		} else {
-		  userMarker.setLatLng(userLatLng);
-		  accuracyCircle.setLatLng(userLatLng).setRadius(acc);
-		}
-	  }, function(err) {
-		console.error("Errore geolocalizzazione:", err);
-	  }, {
-		enableHighAccuracy: true,
-		maximumAge: 10000
-	  });
-	}
-
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition(function(pos) {
+        var lat = pos.coords.latitude,
+            lng = pos.coords.longitude,
+            acc = pos.coords.accuracy;
+        userLatLng = [lat, lng];
+        if (!userMarker) {
+          userMarker = L.marker(userLatLng).addTo(map);
+          accuracyCircle = L.circle(userLatLng, {
+            radius: acc, color: '#136AEC', fillOpacity: 0.15
+          }).addTo(map);
+        } else {
+          userMarker.setLatLng(userLatLng);
+          accuracyCircle.setLatLng(userLatLng).setRadius(acc);
+        }
+      }, function(err) {
+        console.error("Errore geolocalizzazione:", err);
+      }, {
+        enableHighAccuracy: true,
+        maximumAge: 10000
+      });
+    }
 
     // 4. Carica KML, imposta stile e calcola centroide
     var territoryCenter;
@@ -112,11 +129,9 @@
         alert("Attendi qualche istante per la geolocalizzazione o il caricamento del KML.");
         return;
       }
-      // Se esiste già un routing, rimuovilo
       if (routingControl) {
         map.removeControl(routingControl);
       }
-      // Crea nuovo routing control
       routingControl = L.Routing.control({
         waypoints: [
           L.latLng(userLatLng[0], userLatLng[1]),
@@ -128,30 +143,20 @@
         lineOptions: {
           styles: [{ color: 'blue', opacity: 0.7, weight: 5 }]
         },
-        createMarker: function(i, waypoint, n) {
+        createMarker: function(i, waypoint) {
           var markerOpts = {};
-          if (i === 0) {
-            // marker origine (utente)
-            markerOpts.icon = L.icon({
-              iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
-              iconSize: [25, 41], iconAnchor: [12, 41],
-              popupAnchor: [1, -34]
-            });
-          } else {
-            // marker destinazione (centro KML)
-            markerOpts.icon = L.icon({
-              iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
-              iconSize: [25, 41], iconAnchor: [12, 41],
-              popupAnchor: [1, -34]
-            });
-          }
+          markerOpts.icon = L.icon({
+            iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
+            iconSize: [25, 41], iconAnchor: [12, 41],
+            popupAnchor: [1, -34]
+          });
           return L.marker(waypoint.latLng, markerOpts);
         },
         fitSelectedRoutes: true,
         showAlternatives: false,
         addWaypoints: false,
         routeWhileDragging: false,
-		show: false
+        show: false
       }).addTo(map);
 
       routingControl.on('routesfound', function(e) {
@@ -168,60 +173,146 @@
         routingControl = null;
       }
     });
-	
-	  // 1. Costruisci il nome del file da caricare
-	//    Parto da territoryName, es. "Territorio 1"
-	//    Sostituisco tutti gli spazi (o caratteri non alfanumerici) con underscore
-	var safeName = territoryName
-    .trim()
-    .replace(/\s+/g, '_')          // "Territorio 1" → "Territorio_1"
-    .replace(/[^a-zA-Z0-9_]/g, ''); // rimuove eventuali altri caratteri non validi
 
-	var phoneFileName = 'data_' + safeName + '.txt'; 
-  
-	 // --------------- Inizio parte fetch-phone ---------------
-    // 2. Provo a fare fetch su questo file
-  document.addEventListener('DOMContentLoaded', function() {
-    fetch(phoneFileName)
-      .then(function(response) {
-        if (!response.ok) {
-          // Se non trovo il file, nascondo la sezione o mostro un avviso
-          console.warn('Impossibile caricare ' + phoneFileName + ': ' + response.statusText);
-          document.getElementById('info-section').style.display = 'none';
-          throw new Error('File non trovato: ' + phoneFileName);
-        }
-        return response.text();
-      })
-      .then(function(text) {
-        // Supponiamo che in data_Territorio_1.txt ci sia un numero per riga
-        var lines = text.split(/\r?\n/).map(function(riga) {
-          return riga.trim();
-        }).filter(function(riga) {
-          return riga !== '';
-        });
+    // 8. Costruisci il nome del file da caricare per i telefoni
+    var safeName = territoryName
+      .trim()
+      .replace(/\s+/g, '_')          // "Territorio 1" → "Territorio_1"
+      .replace(/[^a-zA-Z0-9_]/g, ''); // rimuove caratteri non validi
 
-        var ul = document.getElementById('phone-list');
-        if (lines.length === 0) {
-          // File esistente ma vuoto, nascondo comunque
-          document.getElementById('info-section').style.display = 'none';
-          return;
-        }
-        lines.forEach(function(numero) {
-          var li = document.createElement('li');
-          li.textContent = numero;
-          ul.appendChild(li);
+    var phoneFileName = 'data_' + safeName + '.txt';
+
+    // 9. Fetch dei numeri di telefono
+    document.addEventListener('DOMContentLoaded', function() {
+      fetch(phoneFileName)
+        .then(function(response) {
+          if (!response.ok) {
+            console.warn('Impossibile caricare ' + phoneFileName + ': ' + response.statusText);
+            document.getElementById('info-section').style.display = 'none';
+            throw new Error('File non trovato: ' + phoneFileName);
+          }
+          return response.text();
+        })
+        .then(function(text) {
+          var lines = text.split(/\r?\n/).map(function(riga) {
+            return riga.trim();
+          }).filter(function(riga) {
+            return riga !== '';
+          });
+
+          var ul = document.getElementById('phone-list');
+          if (lines.length === 0) {
+            document.getElementById('info-section').style.display = 'none';
+            return;
+          }
+          lines.forEach(function(numero) {
+            var li = document.createElement('li');
+            li.textContent = numero;
+            ul.appendChild(li);
+          });
+        })
+        .catch(function(err) {
+          console.error(err);
         });
-      })
-      .catch(function(err) {
-        // In caso di errore (file mancante, permessi, ecc.), già nascosto in then()
-        console.error(err);
+    });
+
+    // 10. Bottone “Invia” per aprire il form con compilazione automatica
+    document.getElementById('send-form').addEventListener('click', function() {
+      var inputVal = document.getElementById('form-input').value.trim();
+      if (!inputVal) {
+        alert("Inserisci un valore nel campo di testo prima di inviare.");
+        return;
+      }
+
+      var baseFormUrl = "https://docs.google.com/forms/d/e/<YOUR_FORM_ID>/viewform";
+      var prefillParam = "entry.<ENTRY_ID>=" + encodeURIComponent(inputVal);
+      var fullUrl = baseFormUrl + "?" + prefillParam;
+      window.open(fullUrl, "_blank");
+    });
+
+    /* ====== Rotazione con due dita (touch) ======
+       Implementazione: catturiamo gesture touch con due dita, calcoliamo l'angolo
+       tra i due punti e applichiamo una rotazione CSS al contenitore della mappa.
+       Nota importante: questa tecnica ruota visivamente la mappa ma NON cambia
+       la proiezione o la logica interna di Leaflet — pertanto le interazioni
+       (click, posizionamento marker, routing) possono risultare disallineate
+       rispetto alla vista ruotata. Se vuoi una rotazione "vera" con coordinate
+       corrette, considera Mapbox GL o OpenLayers (vedi nota sotto).
+    */
+
+    (function enableTwoFingerRotation() {
+      var container = map.getContainer();
+      var isRotating = false;
+      var startAngle = 0;     // angolo iniziale al touchstart (deg)
+      var rotation = 0;       // rotazione corrente applicata (deg)
+      var lastRotation = 0;   // rotazione alla fine dell'ultima gesture
+
+      function getAngle(t1, t2) {
+        var dx = t2.clientX - t1.clientX;
+        var dy = t2.clientY - t1.clientY;
+        return Math.atan2(dy, dx) * 180 / Math.PI;
+      }
+
+      container.addEventListener('touchstart', function(e) {
+        if (e.touches.length === 2) {
+          isRotating = true;
+          startAngle = getAngle(e.touches[0], e.touches[1]);
+          // disabilitiamo il comportamento di pan/zoom di leaflet mentre ruotiamo
+          if (map.dragging) map.dragging.disable();
+          if (map.touchZoom) map.touchZoom.disable();
+          if (map.doubleClickZoom) map.doubleClickZoom.disable();
+          container.style.transition = 'transform 0s';
+          e.preventDefault(); // fondamentale per catturare la gesture
+        }
+      }, { passive: false });
+
+      container.addEventListener('touchmove', function(e) {
+        if (!isRotating || e.touches.length !== 2) return;
+        var angle = getAngle(e.touches[0], e.touches[1]);
+        rotation = lastRotation + (angle - startAngle);
+        // Applichiamo la rotazione al contenitore della mappa
+        container.style.transform = 'rotate(' + rotation + 'deg)';
+        // Ruotiamo i controlli in senso opposto per tenerli leggibili
+        var controls = document.querySelectorAll('.leaflet-control');
+        controls.forEach(function(c) {
+          c.style.transform = 'rotate(' + (-rotation) + 'deg)';
+        });
+        e.preventDefault();
+      }, { passive: false });
+
+      container.addEventListener('touchend', function(e) {
+        if (!isRotating) return;
+        if (e.touches.length < 2) {
+          // fine della gesture
+          isRotating = false;
+          lastRotation = rotation;
+          container.style.transition = 'transform 150ms ease-out';
+          // riabilitiamo le interazioni leaflet
+          if (map.dragging) map.dragging.enable();
+          if (map.touchZoom) map.touchZoom.enable();
+          if (map.doubleClickZoom) map.doubleClickZoom.enable();
+          // NOTA: Leaflet non "conosce" la rotazione CSS, quindi le
+          // coordinate per click/drag non sono aggiornate — vedi spiegazione.
+        }
       });
-	});
-    // --------------- Fine parte fetch-phone ---------------
-	
-	
-	
-	
+
+      // Opzionale: bottone per resettare la rotazione
+      var resetBtn = document.createElement('button');
+      resetBtn.textContent = 'Reset rotazione';
+      resetBtn.style.position = 'absolute';
+      resetBtn.style.top = '8px';
+      resetBtn.style.right = '8px';
+      resetBtn.style.zIndex = 1000;
+      resetBtn.addEventListener('click', function() {
+        rotation = 0; lastRotation = 0;
+        container.style.transition = 'transform 200ms ease-out';
+        container.style.transform = '';
+        document.querySelectorAll('.leaflet-control').forEach(function(c) { c.style.transform = ''; });
+      });
+      // aggiungiamo il bottone alla mappa (DOM) e lo lasciamo fuori dalla logica di Leaflet
+      container.appendChild(resetBtn);
+    })();
+
   </script>
 </body>
 </html>
