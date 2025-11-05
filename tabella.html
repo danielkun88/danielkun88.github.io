@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tabella da Google Sheets (CSV)</title>
+  <style>
+    table{border-collapse:collapse;width:100%;font-family:Arial}
+    th,td{border:1px solid #ccc;padding:6px;text-align:left}
+    th{background:#f4f4f4}
+  </style>
+</head>
+<body>
+  <h1>Dati da Google Sheets</h1>
+  <div>
+    <!-- Sostituisci con il tuo sheet id e gid -->
+    <button id="load">Carica dati</button>
+  </div>
+  <div id="message"></div>
+  <div id="table-wrap"></div>
+
+  <script>
+    // CONFIG: inserisci qui il tuo sheet id e gid
+    const SHEET_ID = "SOSTITUISCI_CON_LO_SHEET_ID";
+    const GID = "0"; // cambia se necessario
+
+    function csvToArray(text) {
+      const rows = [];
+      const lines = text.split(/\r\n|\n/);
+      for (let line of lines) {
+        if (!line) continue;
+        // semplice split che funziona per dati senza molte virgole incapsulate
+        // per CSV robusti si dovrebbe usare un parser
+        const cols = line.split(',');
+        rows.push(cols.map(c => c.replace(/^"|"$/g, '')));
+      }
+      return rows;
+    }
+
+    async function loadCsv() {
+	
+      const url = `https://docs.google.com/spreadsheets/d/${14JLvzy_5uRqheSjFexyCRcvlouf3Y8D1xX26QucGXM8}/export?format=csv&gid=${0}`;
+      document.getElementById('message').textContent = "Caricamento...";
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Errore HTTP " + res.status);
+        const text = await res.text();
+        const data = csvToArray(text);
+        renderTable(data);
+        document.getElementById('message').textContent = "Caricamento completato.";
+      } catch (err) {
+        document.getElementById('message').textContent = "Errore: " + err.message;
+      }
+    }
+
+    function renderTable(data) {
+      if (!data || data.length === 0) { document.getElementById('table-wrap').innerHTML = "<em>Nessun dato</em>"; return; }
+      const headers = data[0];
+      const rows = data.slice(1);
+      const table = document.createElement('table');
+      const thead = document.createElement('thead');
+      const trh = document.createElement('tr');
+      headers.forEach(h => { const th = document.createElement('th'); th.textContent = h; trh.appendChild(th); });
+      thead.appendChild(trh);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        headers.forEach((_,i) => {
+          const td = document.createElement('td');
+          td.textContent = r[i] ?? "";
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+
+      const wrap = document.getElementById('table-wrap');
+      wrap.innerHTML = "";
+      wrap.appendChild(table);
+    }
+
+    document.getElementById('load').addEventListener('click', loadCsv);
+  </script>
+</body>
+</html>
